@@ -29,7 +29,5 @@
     "webpack-cli": "^2.1.5",
     "webpack-dev-server": "^3.1.4"
   },
-  "dependencies": {
-    "dom": "0.0.3"
-  }
+  "dependencies": {}
 }
