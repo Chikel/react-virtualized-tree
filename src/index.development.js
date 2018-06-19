@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
-import ConnectedApp from './ConnectedApp';
+import VirtualizedTree from './Tree';
 
-ReactDOM.render(<ConnectedApp />, document.getElementById('root'));
+ReactDOM.render(<VirtualizedTree/>, document.getElementById('root'));

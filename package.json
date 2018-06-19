@@ -29,5 +29,7 @@
     "webpack-cli": "^2.1.5",
     "webpack-dev-server": "^3.1.4"
   },
-  "dependencies": {}
+  "dependencies": {
+    "react-virtualized": "^9.19.1"
+  }
 }
