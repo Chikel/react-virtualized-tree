@@ -1,2 +1,2 @@
-# side-menu
-An npm library exposing a side-menu component
+# react-virtualized-tree
+An npm library exposing a virtualized tree component
