@@ -9,15 +9,12 @@ const htmlWebpackPlugin = new HtmlWebPackPlugin({
 });
 
 const config = {
+  resolve: {
+    extensions: [".ts", ".tsx", ".js", ".jsx"]
+  },
   module: {
     rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader'
-        }
-      },
+      { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
       {
         test: /\.css$/,
         use: [
@@ -32,7 +29,7 @@ const config = {
 
 module.exports = (env, argv) => {
   if (argv.mode === 'development') {
-    config.entry = './src/index.development.js';
+    config.entry = './src/index.development.tsx';
 
     config.plugins.push(htmlWebpackPlugin);
 
@@ -42,14 +39,14 @@ module.exports = (env, argv) => {
   }
 
   if (argv.mode === 'production') {
-    config.entry = './src/index.production.js';
+    config.entry = './src/index.production.tsx';
 
     config.output = {
       path: path.resolve(__dirname, './dist'),
       filename: 'index.js',
       libraryTarget: 'umd',
       globalObject: 'this',
-      library: 'eagledashboard'
+      library: 'react-vt'
     };
 
     config.externals = {
