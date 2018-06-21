@@ -1,0 +1,14 @@
+@keyframes row-opacity {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}
+
+.list {
+    width: 100px;
+    height: 100%;
+}
+
+.row {
+    animation: row-opacity 0.3s linear;
+}
+
