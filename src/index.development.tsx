@@ -12,16 +12,22 @@ const items = [
     ]
   },
   {id: 2, name: "Ron"},
-  {id: 4, name: "Chikel"}
+  {id: 4, name: "Chikel", children: [
+      {id: 7, name: 'Brian'},
+      {id: 8, name: 'Mary'}
+    ]}
 ];
 
 const renderRow = (item, expandCallback): JSX.Element => (
-  <div className="row" key={item.id} onClick={expandCallback}>{item.name}</div>
+  <div key={item.id} onClick={expandCallback}>{item.name}</div>
 );
 
 ReactDOM.render(
   <div style={{height: '100vh', position: 'relative'}}>
-    <Tree items={items} itemRenderer={renderRow} className={'list'} rowHeight={50}/>
+    <Tree items={items}
+          itemRenderer={renderRow}
+          className={'list'}
+          rowHeight={50}/>
   </div>,
   document.getElementById('root')
 );
