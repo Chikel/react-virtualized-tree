@@ -1,7 +1,7 @@
 {
-  "name": "side-menu",
+  "name": "rickle-vt",
   "version": "1.0.0",
-  "description": "React side-menu",
+  "description": "React virtualized tree",
   "main": "dist/index.js",
   "scripts": {
     "start": "NODE_ENV=development webpack-dev-server --mode development --open",
