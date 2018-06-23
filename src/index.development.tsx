@@ -2,24 +2,25 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import "./index.css";
 import Tree from "./Tree";
+import { range } from "lodash/fp";
+const uuid = require("uuid/v4");
 
-const items = [
-  {id: 0, name: "Bob"},
-  {
-    id: 1, name: "Alice", children: [
-      {id: 5, name: 'Brian'},
-      {id: 16, name: 'Mary'},
-      {id: 36, name: 'aMary'},
-      {id: 46, name: 'cMary'},
-      {id: 56, name: 'dMary'}
-    ]
-  },
-  {id: 2, name: "Ron"},
-  {id: 4, name: "Chikel", children: [
-      {id: 7, name: 'Brian'},
-      {id: 8, name: 'Mary'}
-    ]}
-];
+const items = range(0, 100).map(() => ({
+  id: uuid(),
+  name: uuid(),
+  children: range(0, 10).map(() => ({
+    id: uuid(),
+    name: uuid(),
+    children: range(0, 10).map(() => ({
+      id: uuid(),
+      name: uuid(),
+      children: range(0, 10).map(() => ({
+        id: uuid(),
+        name: uuid()
+      }))
+    }))
+  }))
+}));
 
 const renderRow = (item, expandCallback): JSX.Element => (
   <div key={item.id} onClick={expandCallback}>
@@ -28,15 +29,13 @@ const renderRow = (item, expandCallback): JSX.Element => (
 );
 
 ReactDOM.render(
-  <div style={{ height: "100vh", position: "relative" }}>
-    <Tree
-      transitionDuration={500}
-      itemRenderer={renderRow}
-      className={"list"}
-      indentation={20}
-      rowHeight={30}
-      items={items}
-    />
-  </div>,
+  <Tree
+    transitionDuration={500}
+    itemRenderer={renderRow}
+    className={"list"}
+    indentation={20}
+    rowHeight={20}
+    items={items}
+  />,
   document.getElementById("root")
 );

@@ -1,19 +1,8 @@
-@keyframes expand {
-  from {
-    height: 0;
-  }
-  to {
-    height: 30px;
-  }
-}
-
-@keyframes collapse {
-  from {
-    height: 30px;
-  }
-  to {
-    height: 0;
-  }
+html,
+body,
+#root {
+  min-height: 100vh;
+  margin: 0;
 }
 
 .tree-virtualized-list.row-expanding
@@ -22,6 +11,6 @@
 }
 
 .list {
-  width: 100px;
-  height: 100%;
+  width: 400px;
+  height: 400px;
 }

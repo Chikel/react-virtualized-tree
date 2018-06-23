@@ -70,12 +70,19 @@ class Tree extends React.Component<TreeProps, TreeState> {
   };
 
   getRowHeight = ({ index }) => {
-    const { expandingRowIndex, pendingDeltaRowCount } = this.state;
+    const {
+      expandingRowIndex,
+      collapsingRowIndex,
+      pendingDeltaRowCount
+    } = this.state;
+    const animatingRowIndex = isNil(expandingRowIndex)
+      ? collapsingRowIndex
+      : expandingRowIndex;
 
     if (
-      !isNil(expandingRowIndex) &&
-      index > expandingRowIndex &&
-      index <= expandingRowIndex + pendingDeltaRowCount
+      !isNil(animatingRowIndex) &&
+      index > animatingRowIndex &&
+      index <= animatingRowIndex + Math.abs(pendingDeltaRowCount)
     ) {
       return 0;
     }
@@ -90,45 +97,23 @@ class Tree extends React.Component<TreeProps, TreeState> {
       pendingDeltaRowCount
     } = this.state;
     const { transitionDuration, rowHeight } = this.props;
+    const animatingRowIndex = isNil(expandingRowIndex)
+      ? collapsingRowIndex
+      : expandingRowIndex;
+    const isExpanding = !isNil(expandingRowIndex);
 
-    if (!isNil(expandingRowIndex)) {
-      if (index > expandingRowIndex) {
-        if (index > expandingRowIndex + pendingDeltaRowCount) {
-          return {
-            transition: `top linear ${transitionDuration}ms`,
-            top: style.top + pendingDeltaRowCount * rowHeight
+    if (!isNil(animatingRowIndex) && index > animatingRowIndex) {
+      return index > animatingRowIndex + Math.abs(pendingDeltaRowCount)
+        ? {
+            top: style.top + Math.abs(pendingDeltaRowCount) * rowHeight,
+            animation:
+              !isExpanding && `moveUp ${transitionDuration}ms forwards`,
+            transition: isExpanding && `top ease-in ${transitionDuration}ms`
+          }
+        : {
+            top: style.top + (index - animatingRowIndex - 1) * rowHeight,
+            height: rowHeight
           };
-        }
-
-        return {
-          animation: `expand ${transitionDuration /
-            pendingDeltaRowCount}ms forwards`,
-          top: style.top + (index - expandingRowIndex - 1) * rowHeight,
-          animationDelay: `${(index - expandingRowIndex - 1) *
-            (transitionDuration / pendingDeltaRowCount)}ms`
-        };
-      }
-    }
-
-    if (!isNil(collapsingRowIndex)) {
-      if (index > collapsingRowIndex) {
-        if (index > collapsingRowIndex + Math.abs(pendingDeltaRowCount)) {
-          return {
-            transition: `top linear ${transitionDuration}ms`,
-            top: style.top + pendingDeltaRowCount * rowHeight
-          };
-        }
-
-        return {
-          animation: `collapse ${transitionDuration /
-            Math.abs(pendingDeltaRowCount)}ms forwards`,
-          animationDelay: `${
-              (transitionDuration / Math.abs(pendingDeltaRowCount))
-              *
-              (Math.abs(pendingDeltaRowCount) - (index - collapsingRowIndex))
-          }ms`
-        };
-      }
     }
 
     return null;
@@ -146,7 +131,8 @@ class Tree extends React.Component<TreeProps, TreeState> {
           ...style,
           ...this.getRowExtraStyle({ index, style }),
           overflow: "hidden",
-          left: currentItem.level * indentation
+          left: currentItem.level * indentation,
+          backgroundColor: index % 2 === 0 ? "#fff" : "#f7f7f7"
         }}
       >
         {itemRenderer(currentItem, () =>
@@ -170,60 +156,71 @@ class Tree extends React.Component<TreeProps, TreeState> {
     );
     const isExpanding = !get([rowLevel, rowId], expandedMap);
 
-    if (isExpanding) {
-      this.setState(
-        {
-          expandingRowIndex: rowIndex,
-          pendingDeltaRowCount:
-            nextNormalizedTreeItems.length - normalizedTreeItems.length,
-          expandedMap: updatedExpandedMap,
-          normalizedTreeItems: nextNormalizedTreeItems
-        },
-        () => {
-          this.list.recomputeRowHeights();
-          setTimeout(() => {
-            this.setState(
-              {
-                expandingRowIndex: null,
-                pendingDeltaRowCount: 0
-              },
-              () => this.list.recomputeRowHeights()
-            );
-          }, transitionDuration);
-        }
-      );
-    } else {
-      this.setState(
-        {
-          collapsingRowIndex: rowIndex,
-          pendingDeltaRowCount:
-            nextNormalizedTreeItems.length - normalizedTreeItems.length
-        },
-        () => {
-          this.list.recomputeRowHeights();
-          setTimeout(() => {
-            this.setState(
-              {
-                collapsingRowIndex: null,
-                pendingDeltaRowCount: 0,
-                expandedMap: updatedExpandedMap,
-                normalizedTreeItems: nextNormalizedTreeItems
-              },
-              () => this.list.recomputeRowHeights()
-            );
-          }, transitionDuration);
-        }
-      );
-    }
+    this.setState(
+      isExpanding
+        ? {
+            ...this.state,
+            expandingRowIndex: rowIndex,
+            pendingDeltaRowCount:
+              nextNormalizedTreeItems.length - normalizedTreeItems.length,
+            expandedMap: updatedExpandedMap,
+            normalizedTreeItems: nextNormalizedTreeItems
+          }
+        : {
+            ...this.state,
+            collapsingRowIndex: rowIndex,
+            pendingDeltaRowCount:
+              nextNormalizedTreeItems.length - normalizedTreeItems.length
+          },
+      () => {
+        this.list.recomputeRowHeights();
+        setTimeout(() => {
+          this.setState(
+            isExpanding
+              ? {
+                  ...this.state,
+                  expandingRowIndex: null,
+                  pendingDeltaRowCount: 0
+                }
+              : {
+                  ...this.state,
+                  collapsingRowIndex: null,
+                  pendingDeltaRowCount: 0,
+                  expandedMap: updatedExpandedMap,
+                  normalizedTreeItems: nextNormalizedTreeItems
+                },
+            () => this.list.recomputeRowHeights()
+          );
+        }, transitionDuration);
+      }
+    );
   };
 
   render() {
-    const { normalizedTreeItems, expandingRowIndex } = this.state;
-    const { className } = this.props;
+    const {
+      normalizedTreeItems,
+      expandingRowIndex,
+      pendingDeltaRowCount
+    } = this.state;
+    const { className, rowHeight } = this.props;
     const isExpanding = !isNil(expandingRowIndex);
 
     return (
       <div className={className}>
+        <div
+          dangerouslySetInnerHTML={{
+            __html: `
+              <style>
+                @keyframes moveUp {
+                  to {
+                    transform: translateY(${pendingDeltaRowCount *
+                      rowHeight}px);
+                  }
+                }
+              </style>
+        `
+          }}
+        />
         <AutoSizer>
           {({ width, height }) => (
             <List

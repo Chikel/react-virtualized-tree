@@ -33,6 +33,7 @@
     "webpack-dev-server": "^3.1.4"
   },
   "dependencies": {
+    "node-uuid": "1.4.8",
     "react-virtualized": "^9.19.1"
   }
 }
