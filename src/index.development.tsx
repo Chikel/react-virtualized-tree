@@ -1,14 +1,17 @@
-import * as React from 'react';
-import * as ReactDOM from 'react-dom';
-import './index.css';
-import Tree from './Tree'
+import * as React from "react";
+import * as ReactDOM from "react-dom";
+import "./index.css";
+import Tree from "./Tree";
 
 const items = [
   {id: 0, name: "Bob"},
   {
     id: 1, name: "Alice", children: [
       {id: 5, name: 'Brian'},
-      {id: 6, name: 'Mary'}
+      {id: 16, name: 'Mary'},
+      {id: 36, name: 'aMary'},
+      {id: 46, name: 'cMary'},
+      {id: 56, name: 'dMary'}
     ]
   },
   {id: 2, name: "Ron"},
@@ -19,15 +22,21 @@ const items = [
 ];
 
 const renderRow = (item, expandCallback): JSX.Element => (
-  <div key={item.id} onClick={expandCallback}>{item.name}</div>
+  <div key={item.id} onClick={expandCallback}>
+    {item.name}
+  </div>
 );
 
 ReactDOM.render(
-  <div style={{height: '100vh', position: 'relative'}}>
-    <Tree items={items}
-          itemRenderer={renderRow}
-          className={'list'}
-          rowHeight={50}/>
+  <div style={{ height: "100vh", position: "relative" }}>
+    <Tree
+      transitionDuration={500}
+      itemRenderer={renderRow}
+      className={"list"}
+      indentation={20}
+      rowHeight={30}
+      items={items}
+    />
   </div>,
-  document.getElementById('root')
+  document.getElementById("root")
 );
