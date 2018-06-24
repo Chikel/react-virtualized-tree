@@ -208,7 +208,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
 
     return (
       <div className={className}>
-        {headerRenderer()}
+        {headerRenderer && headerRenderer()}
         <div
           dangerouslySetInnerHTML={{
             __html: `
