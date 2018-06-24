@@ -10,6 +10,5 @@ An npm library exposing a virtualized tree component
 | itemRenderer | A callback for rendering each item (callback arguments: current item and click callback) |
 | headerRenderer | Optional header renderer |
 | transitionDuration | Collapse animation duration in milliseconds |
-| indentation | Optional indentation for each level (pixels)|
 | className | Optional root container className|
 
