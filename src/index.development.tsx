@@ -28,9 +28,14 @@ const renderRow = (item, expandCallback): JSX.Element => (
   </div>
 );
 
+const renderHeader = (): JSX.Element => (
+  <div>Hello world</div>
+);
+
 ReactDOM.render(
   <Tree
     transitionDuration={500}
+    headerRenderer={renderHeader}
     itemRenderer={renderRow}
     className={"vt-list"}
     indentation={20}

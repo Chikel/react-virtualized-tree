@@ -11,6 +11,7 @@ interface Item {
 interface TreeProps {
   items: Item[];
   itemRenderer: (item: Item, expandCallback: () => void) => JSX.Element;
+  headerRenderer: () => JSX.Element;
   rowHeight?: number;
   className?: string;
   transitionDuration: number;
@@ -202,11 +203,12 @@ class Tree extends React.Component<TreeProps, TreeState> {
       expandingRowIndex,
       pendingDeltaRowCount
     } = this.state;
-    const { className, rowHeight } = this.props;
+    const { className, rowHeight, headerRenderer } = this.props;
     const isExpanding = !isNil(expandingRowIndex);
 
     return (
       <div className={className}>
+        {headerRenderer()}
         <div
           dangerouslySetInnerHTML={{
             __html: `
