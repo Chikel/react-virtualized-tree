@@ -15,7 +15,6 @@ interface TreeProps {
   rowHeight?: number;
   className?: string;
   transitionDuration: number;
-  indentation: number;
 }
 
 interface TreeState {
@@ -127,7 +126,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
   }
 
   renderRow = ({ key, index, style }) => {
-    const { itemRenderer, indentation } = this.props;
+    const { itemRenderer } = this.props;
     const { normalizedTreeItems } = this.state;
     const currentItem = normalizedTreeItems[index];
 
@@ -138,7 +137,6 @@ class Tree extends React.Component<TreeProps, TreeState> {
           ...style,
           ...this.getRowExtraStyle({ index, style }),
           overflow: "hidden",
-          left: currentItem.level * indentation,
           backgroundColor: index % 2 === 0 ? "#fff" : "#f7f7f7"
         }}
       >

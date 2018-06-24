@@ -30,7 +30,7 @@ class Container extends React.Component {
   };
 
   renderRow = (item, expandCallback): JSX.Element => (
-    <div key={item.id} onClick={expandCallback}>
+    <div key={item.id} onClick={expandCallback} style={{paddingLeft: item.level * 20}}>
       {item.name}
     </div>
   );
@@ -48,7 +48,6 @@ class Container extends React.Component {
           headerRenderer={this.renderHeader}
           itemRenderer={this.renderRow}
           className={"vt-list"}
-          indentation={20}
           rowHeight={this.state.rowHeight}
           items={items}
         />
