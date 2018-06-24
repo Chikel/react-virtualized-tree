@@ -46,7 +46,7 @@ module.exports = (env, argv) => {
       filename: 'index.js',
       libraryTarget: 'umd',
       globalObject: 'this',
-      library: 'react-vt'
+      library: 'rickle-vt'
     };
 
     config.externals = {
