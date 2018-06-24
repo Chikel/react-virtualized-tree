@@ -42,6 +42,12 @@ class Tree extends React.Component<TreeProps, TreeState> {
     this.setState({ normalizedTreeItems: this.getNormalizedTreeItems(items) });
   }
 
+  componentDidUpdate(prevProps) {
+    if(prevProps.rowHeight !== this.props.rowHeight) {
+      this.list.recomputeRowHeights();
+    }
+  }
+
   getNormalizedTreeItems = (
     nodes: Item[],
     expandedMap: TreeState["expandedMap"] = null,
