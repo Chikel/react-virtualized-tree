@@ -1,6 +1,6 @@
 {
   "name": "rickle-vt",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "React virtualized tree",
   "main": "dist/index.js",
   "scripts": {
