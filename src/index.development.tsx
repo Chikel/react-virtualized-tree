@@ -32,7 +32,7 @@ ReactDOM.render(
   <Tree
     transitionDuration={500}
     itemRenderer={renderRow}
-    className={"list"}
+    className={"vt-list"}
     indentation={20}
     rowHeight={20}
     items={items}
