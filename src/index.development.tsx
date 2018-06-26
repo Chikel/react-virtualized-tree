@@ -8,22 +8,21 @@ const uuid = require("uuid/v4");
 const items = range(0, 100).map(() => ({
   id: uuid(),
   name: uuid(),
-  children: range(0, 10).map(() => ({
+  children: range(0, 1).map(() => ({
     id: uuid(),
-    name: uuid(),
-    children: range(0, 10).map(() => ({
-      id: uuid(),
-      name: uuid(),
-      children: range(0, 10).map(() => ({
-        id: uuid(),
-        name: uuid()
-      }))
-    }))
+    name: uuid()
   }))
 }));
 
-const renderRow = (item, expandCallback): JSX.Element => (
-  <div key={item.id} onClick={expandCallback}>
+const renderItem = ({ item, index, toggleChildren }): JSX.Element => (
+  <div
+    style={{
+      backgroundColor: index % 2 === 0 ? "#fff" : "#f7f7f7",
+      paddingLeft: item.level * 20
+    }}
+    onClick={toggleChildren}
+    key={item.id}
+  >
     {item.name}
   </div>
 );
@@ -31,10 +30,9 @@ const renderRow = (item, expandCallback): JSX.Element => (
 ReactDOM.render(
   <Tree
     transitionDuration={500}
-    itemRenderer={renderRow}
+    itemRenderer={renderItem}
     className={"list"}
-    indentation={20}
-    rowHeight={20}
+    itemHeight={20}
     items={items}
   />,
   document.getElementById("root")
