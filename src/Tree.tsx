@@ -31,6 +31,7 @@ interface TreeState {
     rowIndex: number;
     animatedChildRowItems: Item[];
     isExpanding: boolean;
+    duration: number;
   };
 }
 
@@ -111,10 +112,9 @@ class Tree extends React.Component<TreeProps, TreeState> {
   `;
 
   /*** sorted by priority: ***/
-  // todo 1.) virtualized animation duration
-  // todo 2.) disable click on item without children
-  // todo 3.) add types to all the functions
-  // todo 4.) #cleancoding
+  // todo 1.) disable click on item without children
+  // todo 2.) add types to all the functions
+  // todo 3.) #cleancoding
   getRowClickHandler = (rowLevel, rowId, rowIndex) => () => {
     const { rowTopOffsets, listHeight, list, props, state } = this;
     const { items, transitionDuration, itemHeight } = props;
@@ -145,7 +145,8 @@ class Tree extends React.Component<TreeProps, TreeState> {
         currentAnimation: {
           rowIndex,
           animatedChildRowItems: animatedItems,
-          isExpanding
+          isExpanding,
+          duration: transitionDuration * (animatedRowCount / deltaRowCount)
         }
       },
       () => {
@@ -169,8 +170,12 @@ class Tree extends React.Component<TreeProps, TreeState> {
   };
 
   getAnimatedChildRowsContainerStyle = parentRowStyle => {
-    const { animatedChildRowItems, isExpanding } = this.state.currentAnimation;
-    const { transitionDuration, itemHeight } = this.props;
+    const {
+      animatedChildRowItems,
+      isExpanding,
+      duration
+    } = this.state.currentAnimation;
+    const { itemHeight } = this.props;
 
     return {
       position: "absolute" as "absolute",
@@ -181,7 +186,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
       overflow: "hidden",
       animation: `${
         isExpanding ? "expand" : "collapse"
-      } ${transitionDuration}ms forwards`,
+      } ${duration}ms forwards`,
       animationTimingFunction: "linear"
     };
   };
@@ -194,19 +199,20 @@ class Tree extends React.Component<TreeProps, TreeState> {
     const {
       rowIndex: animatedRowIndex,
       animatedChildRowItems,
-      isExpanding
+      isExpanding,
+      duration
     } = this.state.currentAnimation;
-    const { transitionDuration, itemHeight } = this.props;
+    const { itemHeight } = this.props;
 
     if (index > animatedRowIndex) {
       return isExpanding
         ? {
             top: style.top + animatedChildRowItems.length * itemHeight,
-            transition: `top linear ${this.props.transitionDuration}ms`
+            transition: `top linear ${duration}ms`
           }
         : {
             top: style.top + animatedChildRowItems.length * itemHeight,
-            animation: `slideUp ${transitionDuration}ms forwards`,
+            animation: `slideUp ${duration}ms forwards`,
             animationTimingFunction: "linear"
           };
     }

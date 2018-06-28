@@ -33,7 +33,7 @@ const renderItem = ({ item, expandCallback }): JSX.Element => (
 
 ReactDOM.render(
   <Tree
-    transitionDuration={500}
+    transitionDuration={250}
     itemRenderer={renderItem}
     className="list"
     itemHeight={20}
