@@ -15,7 +15,8 @@ interface TreeProps {
     data: {
       item: Item;
       index: number;
-      toggleChildren: () => void;
+      expandCallback: () => void;
+      updateCallback: () => void;
     }
   ) => JSX.Element;
   itemHeight?: number;
@@ -169,7 +170,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
     const { itemRenderer } = this.props;
     const { normalizedTreeItems, animatedRowCount } = this.state;
     const item = normalizedTreeItems[index];
-    const toggleChildren = animatedRowCount
+    const expandCallback = animatedRowCount
       ? noop
       : this.getRowClickHandler(item.level, item.id, index);
 
@@ -184,7 +185,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
           transition: `top linear ${this.props.transitionDuration}ms`
         }}
       >
-        {itemRenderer({ toggleChildren, item, index })}
+        {itemRenderer({ expandCallback, updateCallback: this.list.forceUpdateGrid, item, index })}
       </div>
     );
   };
