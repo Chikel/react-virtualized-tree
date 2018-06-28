@@ -14,9 +14,8 @@ interface TreeProps {
   itemRenderer: (
     data: {
       item: Item;
-      index: number;
-      expandCallback: () => void;
-      updateCallback: () => void;
+      expandCallback?: () => void;
+      updateCallback?: () => void;
     }
   ) => JSX.Element;
   itemHeight?: number;
@@ -25,10 +24,14 @@ interface TreeProps {
 }
 
 interface TreeState {
-  expandedMap: { [treeLevel: number]: { [itemId: number]: boolean } };
   normalizedTreeItems: Item[];
-  expandingCollapsingRowIndex: number;
-  animatedRowCount: number;
+  expandedMap: { [treeLevel: number]: { [itemId: number]: boolean } };
+  scrollTop: number;
+  currentAnimation: {
+    rowIndex: number;
+    animatedChildRowItems: Item[];
+    isExpanding: boolean;
+  };
 }
 
 class Tree extends React.Component<TreeProps, TreeState> {
@@ -38,10 +41,12 @@ class Tree extends React.Component<TreeProps, TreeState> {
 
   state = {
     normalizedTreeItems: this.getNormalizedTreeItems(this.props.items),
-    expandingCollapsingRowIndex: null,
-    animatedRowCount: null,
-    expandedMap: {}
+    expandedMap: {},
+    scrollTop: 0,
+    currentAnimation: null
   };
+
+  onScroll = ({ scrollTop }) => this.setState({ scrollTop });
 
   disableMouseWheelEvent = e => {
     e.stopPropagation();
@@ -79,63 +84,82 @@ class Tree extends React.Component<TreeProps, TreeState> {
     );
   }
 
-  getCssAnimationStyle = () => `
+  getCssAnimationStyle = () =>
+    this.state.currentAnimation &&
+    `
     <style>
       @keyframes expand {
         to {
-          height: ${this.props.itemHeight}px;
+          height: ${this.props.itemHeight *
+            this.state.currentAnimation.animatedChildRowItems.length}px;
+        }
+      }
+      
+      @keyframes collapse {
+        to {
+          height: 0;
+        }
+      }
+      
+      @keyframes slideUp {
+        to {
+          transform: translateY(-${this.props.itemHeight *
+            this.state.currentAnimation.animatedChildRowItems.length}px);
         }
       }
     </style>
   `;
 
   /*** sorted by priority: ***/
-  // todo 1.) fix expanding of item in the middle when scrollable (wrap parent item with Fragment and render it's children items below it, so react-virtualized list wont update it's scrollTop and harm the expanding\collapsing animation by moving the scroll thumb)
-  // todo 2.) implement collapsing
-  // todo 3.) disable click on item without children
-  // todo 4.) animate clip instead of height for better expanding/collapsing behavior
-  // todo 5.) better variable names
-  // todo 6.) stay awsome !
+  // todo 1.) virtualized animation duration
+  // todo 2.) disable click on item without children
+  // todo 3.) add types to all the functions
+  // todo 4.) #cleancoding
   getRowClickHandler = (rowLevel, rowId, rowIndex) => () => {
     const { rowTopOffsets, listHeight, list, props, state } = this;
     const { items, transitionDuration, itemHeight } = props;
-    const { expandedMap, normalizedTreeItems } = state;
+    const { expandedMap, normalizedTreeItems: treeItems, scrollTop } = state;
     const nextExpandedMap = update(
       [rowLevel, rowId],
       bool => !bool,
       expandedMap
     );
     const nextTreeItems = this.getNormalizedTreeItems(items, nextExpandedMap);
-    const availableHeight = listHeight - rowTopOffsets[rowIndex] - itemHeight;
-    const deltaRowCount = nextTreeItems.length - normalizedTreeItems.length;
+    const offsetTop = rowTopOffsets[rowIndex] - scrollTop;
+    const availableHeight = listHeight - offsetTop - itemHeight;
+    const deltaRowCount = Math.abs(nextTreeItems.length - treeItems.length);
     const animatedRowCount = Math.min(
-      availableHeight / itemHeight,
+      Math.round(availableHeight / itemHeight),
       deltaRowCount
+    );
+    const isExpanding = !get([rowLevel, rowId], expandedMap);
+    const animatedItems = (isExpanding ? nextTreeItems : treeItems).slice(
+      rowIndex + 1,
+      rowIndex + animatedRowCount + 1
     );
 
     document.addEventListener("mousewheel", this.disableMouseWheelEvent, false);
     this.setState(
       {
-        expandingCollapsingRowIndex: rowIndex,
-        animatedRowCount,
-        expandedMap: nextExpandedMap,
-        normalizedTreeItems: [
-          ...nextTreeItems.slice(0, rowIndex + animatedRowCount + 1),
-          ...nextTreeItems.slice(
-            rowIndex + deltaRowCount + 1,
-            nextTreeItems.length
-          )
-        ]
+        normalizedTreeItems: isExpanding ? treeItems : nextTreeItems,
+        currentAnimation: {
+          rowIndex,
+          animatedChildRowItems: animatedItems,
+          isExpanding
+        }
       },
       () => {
         list.recomputeRowHeights();
         setTimeout(() => {
-          document.removeEventListener("mousewheel", this.disableMouseWheelEvent);
+          document.removeEventListener(
+            "mousewheel",
+            this.disableMouseWheelEvent
+          );
           this.setState(
             {
-              expandingCollapsingRowIndex: null,
-              animatedRowCount: null,
-              normalizedTreeItems: nextTreeItems
+              normalizedTreeItems: nextTreeItems,
+              expandedMap: nextExpandedMap,
+              currentAnimation: null
             },
             () => list.recomputeRowHeights()
           );
@@ -144,54 +168,97 @@ class Tree extends React.Component<TreeProps, TreeState> {
     );
   };
 
-  getRowExtraStyle(index) {
-    const { expandingCollapsingRowIndex, animatedRowCount } = this.state;
-    const { transitionDuration } = this.props;
+  getAnimatedChildRowsContainerStyle = parentRowStyle => {
+    const { animatedChildRowItems, isExpanding } = this.state.currentAnimation;
+    const { transitionDuration, itemHeight } = this.props;
 
-    if (
-      index > expandingCollapsingRowIndex &&
-      index < expandingCollapsingRowIndex + animatedRowCount + 1
-    ) {
-      return {
-        overflow: "hidden",
-        height: 0,
-        animationTimingFunction: "linear",
-        animation: `expand ${transitionDuration /
-          Math.abs(animatedRowCount)}ms forwards`,
-        animationDelay: `${(index - expandingCollapsingRowIndex - 1) *
-          (transitionDuration / Math.abs(animatedRowCount))}ms`
-      };
+    return {
+      position: "absolute" as "absolute",
+      top: parentRowStyle.top + itemHeight,
+      right: 0,
+      left: 0,
+      height: isExpanding ? 0 : animatedChildRowItems.length * itemHeight,
+      overflow: "hidden",
+      animation: `${
+        isExpanding ? "expand" : "collapse"
+      } ${transitionDuration}ms forwards`,
+      animationTimingFunction: "linear"
+    };
+  };
+
+  getRowExtraStyle(index, style) {
+    if (!this.state.currentAnimation) {
+      return null;
+    }
+
+    const {
+      rowIndex: animatedRowIndex,
+      animatedChildRowItems,
+      isExpanding
+    } = this.state.currentAnimation;
+    const { transitionDuration, itemHeight } = this.props;
+
+    if (index > animatedRowIndex) {
+      return isExpanding
+        ? {
+            top: style.top + animatedChildRowItems.length * itemHeight,
+            transition: `top linear ${this.props.transitionDuration}ms`
+          }
+        : {
+            top: style.top + animatedChildRowItems.length * itemHeight,
+            animation: `slideUp ${transitionDuration}ms forwards`,
+            animationTimingFunction: "linear"
+          };
     }
 
     return null;
   }
 
   renderRow = ({ key, index, style }) => {
-    const { itemRenderer } = this.props;
-    const { normalizedTreeItems, animatedRowCount } = this.state;
+    const { itemRenderer, itemHeight } = this.props;
+    const { normalizedTreeItems, currentAnimation } = this.state;
     const item = normalizedTreeItems[index];
-    const expandCallback = animatedRowCount
+    const expandCallback = currentAnimation
       ? noop
       : this.getRowClickHandler(item.level, item.id, index);
+    const rowStyle = {
+      ...style,
+      ...this.getRowExtraStyle(index, style)
+    };
 
     this.rowTopOffsets[index] = style.top;
 
     return (
-      <div
-        key={item.id}
-        style={{
-          ...style,
-          ...this.getRowExtraStyle(index),
-          transition: `top linear ${this.props.transitionDuration}ms`
-        }}
-      >
-        {itemRenderer({ expandCallback, updateCallback: this.list.forceUpdateGrid, item, index })}
-      </div>
+      <React.Fragment key={item.id}>
+        <div style={rowStyle}>
+          {itemRenderer({
+            expandCallback,
+            // todo check why we need this
+            updateCallback: this.list.forceUpdateGrid,
+            item
+          })}
+        </div>
+        {currentAnimation &&
+          index === currentAnimation.rowIndex && (
+            <div style={this.getAnimatedChildRowsContainerStyle(style)}>
+              {currentAnimation.animatedChildRowItems.map(
+                (currentItem, index) => (
+                  <div
+                    style={{ ...style, top: index * itemHeight }}
+                    key={currentItem.id}
+                  >
+                    {itemRenderer({ item: currentItem })}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+      </React.Fragment>
     );
   };
 
   render() {
-    const { normalizedTreeItems, animatedRowCount } = this.state;
+    const { normalizedTreeItems, currentAnimation } = this.state;
     const { className, itemHeight } = this.props;
 
     return (
@@ -206,12 +273,12 @@ class Tree extends React.Component<TreeProps, TreeState> {
             return (
               <List
                 className={cx("tree-virtualized-list", {
-                  animating: animatedRowCount
+                  animating: !!currentAnimation
                 })}
-                overscanRowCount={animatedRowCount || 10}
                 rowCount={normalizedTreeItems.length}
                 ref={node => (this.list = node)}
                 rowRenderer={this.renderRow}
+                onScroll={this.onScroll}
                 rowHeight={itemHeight}
                 height={height}
                 width={width}
