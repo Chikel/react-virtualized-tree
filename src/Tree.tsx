@@ -1,57 +1,67 @@
 import * as React from "react";
 import { AutoSizer, List } from "react-virtualized";
-import { flatten, update, get, isNil } from "lodash/fp";
+import { flatten, update, get, noop } from "lodash/fp";
 import cx from "classnames";
 
 interface Item {
   id: string | number;
   children?: Item[];
+  level?: number;
 }
 
 interface TreeProps {
   items: Item[];
-  itemRenderer: (item: Item, expandCallback: () => void) => JSX.Element;
-  headerRenderer: () => JSX.Element;
-  rowHeight?: number;
+  itemRenderer: (
+    data: {
+      item: Item;
+      expandCallback?: () => void;
+      updateCallback?: () => void;
+    }
+  ) => JSX.Element;
+  itemHeight?: number;
   className?: string;
   transitionDuration: number;
 }
 
 interface TreeState {
-  expandedMap: { [treeLevel: number]: { [itemId: number]: boolean } };
   normalizedTreeItems: Item[];
-  expandingRowIndex: number;
-  collapsingRowIndex: number;
-  pendingDeltaRowCount: number;
+  expandedMap: { [treeLevel: number]: { [itemId: number]: boolean } };
+  scrollTop: number;
+  currentAnimation: {
+    rowIndex: number;
+    animatedChildRowItems: Item[];
+    isExpanding: boolean;
+    duration: number;
+  };
 }
 
 class Tree extends React.Component<TreeProps, TreeState> {
+  rowTopOffsets: { [key: number]: number } = {};
+  listHeight: number;
   list: List;
 
   state = {
+    normalizedTreeItems: this.getNormalizedTreeItems(this.props.items),
     expandedMap: {},
-    normalizedTreeItems: [],
-    expandingRowIndex: null,
-    collapsingRowIndex: null,
-    pendingDeltaRowCount: 0
+    scrollTop: 0,
+    currentAnimation: null
   };
 
-  componentDidMount() {
-    const { items } = this.props;
-    this.setState({ normalizedTreeItems: this.getNormalizedTreeItems(items) });
-  }
+  onScroll = ({ scrollTop }) => this.setState({ scrollTop });
 
-  componentDidUpdate(prevProps) {
-    if(prevProps.rowHeight !== this.props.rowHeight) {
-      this.list.recomputeRowHeights();
-    }
-  }
+  disableMouseWheelEvent = e => {
+    e.stopPropagation();
+    e.preventDefault();
+    e.cancelBubble = false;
 
-  getNormalizedTreeItems = (
+    return false;
+  };
+
+  getNormalizedTreeItems(
     nodes: Item[],
     expandedMap: TreeState["expandedMap"] = null,
     level: number = 0
-  ): Item[] => {
+  ): Item[] {
     if (!nodes) {
       return null;
     }
@@ -73,52 +83,138 @@ class Tree extends React.Component<TreeProps, TreeState> {
             : [{ ...node, level }]
       )
     );
+  }
+
+  getCssAnimationStyle = () =>
+    this.state.currentAnimation &&
+    `
+    <style>
+      @keyframes expand {
+        to {
+          height: ${this.props.itemHeight *
+            this.state.currentAnimation.animatedChildRowItems.length}px;
+        }
+      }
+      
+      @keyframes collapse {
+        to {
+          height: 0;
+        }
+      }
+      
+      @keyframes slideUp {
+        to {
+          transform: translateY(-${this.props.itemHeight *
+            this.state.currentAnimation.animatedChildRowItems.length}px);
+        }
+      }
+    </style>
+  `;
+
+  /*** sorted by priority: ***/
+  // todo 1.) smooth scroll to the expanded row (make the row positioned as most top as possible)
+  // todo 2.) disable click on item without children
+  // todo 3.) add types to all the functions
+  // todo 4.) #cleancoding
+  getRowClickHandler = (rowLevel, rowId, rowIndex) => () => {
+    const { rowTopOffsets, listHeight, list, props, state } = this;
+    const { items, transitionDuration, itemHeight } = props;
+    const { expandedMap, normalizedTreeItems: treeItems, scrollTop } = state;
+    const nextExpandedMap = update(
+      [rowLevel, rowId],
+      bool => !bool,
+      expandedMap
+    );
+    const nextTreeItems = this.getNormalizedTreeItems(items, nextExpandedMap);
+    const offsetTop = rowTopOffsets[rowIndex] - scrollTop;
+    const availableHeight = listHeight - offsetTop - itemHeight;
+    const deltaRowCount = Math.abs(nextTreeItems.length - treeItems.length);
+    const animatedRowCount = Math.min(
+      Math.round(availableHeight / itemHeight),
+      deltaRowCount
+    );
+    const isExpanding = !get([rowLevel, rowId], expandedMap);
+    const animatedItems = (isExpanding ? nextTreeItems : treeItems).slice(
+      rowIndex + 1,
+      rowIndex + animatedRowCount + 1
+    );
+
+    document.addEventListener("mousewheel", this.disableMouseWheelEvent, false);
+    this.setState(
+      {
+        normalizedTreeItems: isExpanding ? treeItems : nextTreeItems,
+        currentAnimation: {
+          rowIndex,
+          animatedChildRowItems: animatedItems,
+          isExpanding,
+          duration: transitionDuration * (animatedRowCount / deltaRowCount)
+        }
+      },
+      () => {
+        list.recomputeRowHeights();
+        setTimeout(() => {
+          document.removeEventListener(
+            "mousewheel",
+            this.disableMouseWheelEvent
+          );
+          this.setState(
+            {
+              normalizedTreeItems: nextTreeItems,
+              expandedMap: nextExpandedMap,
+              currentAnimation: null
+            },
+            () => list.recomputeRowHeights()
+          );
+        }, transitionDuration);
+      }
+    );
   };
 
-  getRowHeight = ({ index }) => {
+  getAnimatedChildRowsContainerStyle = parentRowStyle => {
     const {
-      expandingRowIndex,
-      collapsingRowIndex,
-      pendingDeltaRowCount
-    } = this.state;
-    const animatingRowIndex = isNil(expandingRowIndex)
-      ? collapsingRowIndex
-      : expandingRowIndex;
+      animatedChildRowItems,
+      isExpanding,
+      duration
+    } = this.state.currentAnimation;
+    const { itemHeight } = this.props;
 
-    if (
-      !isNil(animatingRowIndex) &&
-      index > animatingRowIndex &&
-      index <= animatingRowIndex + Math.abs(pendingDeltaRowCount)
-    ) {
-      return 0;
+    return {
+      position: "absolute" as "absolute",
+      top: parentRowStyle.top + itemHeight,
+      right: 0,
+      left: 0,
+      height: isExpanding ? 0 : animatedChildRowItems.length * itemHeight,
+      overflow: "hidden",
+      animation: `${
+        isExpanding ? "expand" : "collapse"
+      } ${duration}ms forwards`,
+      animationTimingFunction: "ease-out"
+    };
+  };
+
+  getRowExtraStyle(index, style) {
+    if (!this.state.currentAnimation) {
+      return null;
     }
 
-    return this.props.rowHeight;
-  };
-
-  getRowExtraStyle({ index, style }) {
     const {
-      expandingRowIndex,
-      collapsingRowIndex,
-      pendingDeltaRowCount
-    } = this.state;
-    const { transitionDuration, rowHeight } = this.props;
-    const animatingRowIndex = isNil(expandingRowIndex)
-      ? collapsingRowIndex
-      : expandingRowIndex;
-    const isExpanding = !isNil(expandingRowIndex);
+      rowIndex: animatedRowIndex,
+      animatedChildRowItems,
+      isExpanding,
+      duration
+    } = this.state.currentAnimation;
+    const { itemHeight } = this.props;
 
-    if (!isNil(animatingRowIndex) && index > animatingRowIndex) {
-      return index > animatingRowIndex + Math.abs(pendingDeltaRowCount)
+    if (index > animatedRowIndex) {
+      return isExpanding
         ? {
-            top: style.top + Math.abs(pendingDeltaRowCount) * rowHeight,
-            animation:
-              !isExpanding && `moveUp ${transitionDuration}ms forwards`,
-            transition: isExpanding && `top ease-in ${transitionDuration}ms`
+            top: style.top + animatedChildRowItems.length * itemHeight,
+            transition: `top ease-out ${duration}ms`
           }
         : {
-            top: style.top + (index - animatingRowIndex - 1) * rowHeight,
-            height: rowHeight
+            top: style.top + animatedChildRowItems.length * itemHeight,
+            animation: `slideUp ${duration}ms forwards`,
+            animationTimingFunction: "ease-out"
           };
     }
 
@@ -126,121 +222,76 @@ class Tree extends React.Component<TreeProps, TreeState> {
   }
 
   renderRow = ({ key, index, style }) => {
-    const { itemRenderer } = this.props;
-    const { normalizedTreeItems } = this.state;
-    const currentItem = normalizedTreeItems[index];
+    const { itemRenderer, itemHeight } = this.props;
+    const { normalizedTreeItems, currentAnimation } = this.state;
+    const item = normalizedTreeItems[index];
+    const expandCallback = currentAnimation
+      ? noop
+      : this.getRowClickHandler(item.level, item.id, index);
+    const rowStyle = {
+      ...style,
+      ...this.getRowExtraStyle(index, style)
+    };
+
+    this.rowTopOffsets[index] = style.top;
 
     return (
-      <div
-        key={currentItem.id}
-        style={{
-          ...style,
-          ...this.getRowExtraStyle({ index, style }),
-          overflow: "hidden",
-          backgroundColor: index % 2 === 0 ? "#fff" : "#f7f7f7"
-        }}
-      >
-        {itemRenderer(currentItem, () =>
-          this.handleRowClicked(currentItem.level, currentItem.id, index)
-        )}
-      </div>
-    );
-  };
-
-  handleRowClicked = (rowLevel, rowId, rowIndex) => {
-    const { items, transitionDuration } = this.props;
-    const { expandedMap, normalizedTreeItems } = this.state;
-    const updatedExpandedMap = update(
-      [rowLevel, rowId],
-      bool => !bool,
-      expandedMap
-    );
-    const nextNormalizedTreeItems = this.getNormalizedTreeItems(
-      items,
-      updatedExpandedMap
-    );
-    const isExpanding = !get([rowLevel, rowId], expandedMap);
-
-    this.setState(
-      isExpanding
-        ? {
-            ...this.state,
-            expandingRowIndex: rowIndex,
-            pendingDeltaRowCount:
-              nextNormalizedTreeItems.length - normalizedTreeItems.length,
-            expandedMap: updatedExpandedMap,
-            normalizedTreeItems: nextNormalizedTreeItems
-          }
-        : {
-            ...this.state,
-            collapsingRowIndex: rowIndex,
-            pendingDeltaRowCount:
-              nextNormalizedTreeItems.length - normalizedTreeItems.length
-          },
-      () => {
-        this.list.recomputeRowHeights();
-        setTimeout(() => {
-          this.setState(
-            isExpanding
-              ? {
-                  ...this.state,
-                  expandingRowIndex: null,
-                  pendingDeltaRowCount: 0
-                }
-              : {
-                  ...this.state,
-                  collapsingRowIndex: null,
-                  pendingDeltaRowCount: 0,
-                  expandedMap: updatedExpandedMap,
-                  normalizedTreeItems: nextNormalizedTreeItems
-                },
-            () => this.list.recomputeRowHeights()
-          );
-        }, transitionDuration);
-      }
+      <React.Fragment key={item.id}>
+        <div style={rowStyle}>
+          {itemRenderer({
+            expandCallback,
+            // todo check why we need this
+            updateCallback: this.list.forceUpdateGrid,
+            item
+          })}
+        </div>
+        {currentAnimation &&
+          index === currentAnimation.rowIndex && (
+            <div style={this.getAnimatedChildRowsContainerStyle(style)}>
+              {currentAnimation.animatedChildRowItems.map(
+                (currentItem, index) => (
+                  <div
+                    style={{ ...style, top: index * itemHeight }}
+                    key={currentItem.id}
+                  >
+                    {itemRenderer({ item: currentItem })}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+      </React.Fragment>
     );
   };
 
   render() {
-    const {
-      normalizedTreeItems,
-      expandingRowIndex,
-      pendingDeltaRowCount
-    } = this.state;
-    const { className, rowHeight, headerRenderer } = this.props;
-    const isExpanding = !isNil(expandingRowIndex);
+    const { normalizedTreeItems, currentAnimation } = this.state;
+    const { className, itemHeight } = this.props;
 
     return (
-      <div className={className}>
-        {headerRenderer && headerRenderer()}
+      <div className={className} style={{ userSelect: "none" }}>
         <div
-          dangerouslySetInnerHTML={{
-            __html: `
-              <style>
-                @keyframes moveUp {
-                  to {
-                    transform: translateY(${pendingDeltaRowCount *
-                      rowHeight}px);
-                  }
-                }
-              </style>
-        `
-          }}
+          dangerouslySetInnerHTML={{ __html: this.getCssAnimationStyle() }}
         />
         <AutoSizer>
-          {({ width, height }) => (
-            <List
-              ref={node => (this.list = node)}
-              rowCount={normalizedTreeItems.length}
-              rowHeight={this.getRowHeight}
-              rowRenderer={this.renderRow}
-              height={height}
-              width={width}
-              className={cx("tree-virtualized-list", {
-                "row-expanding": isExpanding
-              })}
-            />
-          )}
+          {({ width, height }) => {
+            this.listHeight = height;
+
+            return (
+              <List
+                className={cx("tree-virtualized-list", {
+                  animating: !!currentAnimation
+                })}
+                rowCount={normalizedTreeItems.length}
+                ref={node => (this.list = node)}
+                rowRenderer={this.renderRow}
+                onScroll={this.onScroll}
+                rowHeight={itemHeight}
+                height={height}
+                width={width}
+              />
+            );
+          }}
         </AutoSizer>
       </div>
     );
