@@ -5,15 +5,11 @@ body,
   margin: 0;
 }
 
-.tree-virtualized-list {
-  overflow-x: hidden !important;
-}
-
-.tree-virtualized-list.row-expanding .ReactVirtualized__Grid__innerScrollContainer {
+.virtualized-tree .ReactVirtualized__Grid__innerScrollContainer {
   overflow: visible !important;
 }
 
-.vt-list {
+.list {
   width: 400px;
-  height: 400px;
+  height: 700px;
 }

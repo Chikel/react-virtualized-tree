@@ -1,6 +1,6 @@
 {
   "name": "rickle-vt",
-  "version": "1.4.0",
+  "version": "1.0.0",
   "description": "React virtualized tree",
   "main": "dist/index.js",
   "scripts": {
@@ -22,7 +22,6 @@
     "css-loader": "^0.28.11",
     "html-webpack-plugin": "^3.2.0",
     "lodash": "^4.17.10",
-    "node-uuid": "^1.4.8",
     "react": "^16.4.1",
     "react-dom": "^16.4.1",
     "source-map-loader": "^0.2.3",
@@ -34,6 +33,7 @@
     "webpack-dev-server": "^3.1.4"
   },
   "dependencies": {
-    "react-virtualized": "^9.19.1"
+    "react-virtualized": "^9.19.1",
+    "uuid": "3.2.1"
   }
 }
