@@ -188,7 +188,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
       animation: `${
         isExpanding ? "expand" : "collapse"
       } ${duration}ms forwards`,
-      animationTimingFunction: "linear"
+      animationTimingFunction: "ease-out"
     };
   };
 
@@ -209,12 +209,12 @@ class Tree extends React.Component<TreeProps, TreeState> {
       return isExpanding
         ? {
             top: style.top + animatedChildRowItems.length * itemHeight,
-            transition: `top linear ${duration}ms`
+            transition: `top ease-out ${duration}ms`
           }
         : {
             top: style.top + animatedChildRowItems.length * itemHeight,
             animation: `slideUp ${duration}ms forwards`,
-            animationTimingFunction: "linear"
+            animationTimingFunction: "ease-out"
           };
     }
 
