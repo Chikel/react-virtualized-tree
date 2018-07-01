@@ -5,12 +5,16 @@ import Tree from "./Tree";
 import { range } from "lodash/fp";
 const uuid = require("uuid/v4");
 
-const items = range(0, 10).map(() => ({
+const items = range(0, 200).map(() => ({
   id: uuid(),
   name: uuid(),
-  children: range(0, 100).map(() => ({
+  children: range(0, 20).map(() => ({
     id: uuid(),
-    name: uuid()
+    name: uuid(),
+    children: range(0, 20).map(() => ({
+      id: uuid(),
+      name: uuid()
+    }))
   }))
 }));
 
@@ -29,9 +33,9 @@ const renderItem = ({ item, expandCallback }): JSX.Element => (
 
 ReactDOM.render(
   <Tree
-    transitionDuration={2000}
+    transitionDuration={250}
     itemRenderer={renderItem}
-    className={"list"}
+    className="list"
     itemHeight={20}
     items={items}
   />,
