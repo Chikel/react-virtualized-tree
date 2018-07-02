@@ -265,7 +265,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
   };
 
   render() {
-    const { normalizedTreeItems, currentAnimation } = this.state;
+    const { normalizedTreeItems } = this.state;
     const { className, itemHeight } = this.props;
 
     return (
@@ -279,11 +279,9 @@ class Tree extends React.Component<TreeProps, TreeState> {
 
             return (
               <List
-                className={cx("tree-virtualized-list", {
-                  animating: !!currentAnimation
-                })}
                 rowCount={normalizedTreeItems.length}
                 ref={node => (this.list = node)}
+                className="virtualized-tree"
                 rowRenderer={this.renderRow}
                 onScroll={this.onScroll}
                 rowHeight={itemHeight}
