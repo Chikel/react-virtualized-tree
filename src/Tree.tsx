@@ -7,6 +7,7 @@ interface Item {
   id: string | number;
   children?: Item[];
   level?: number;
+  isExpanded?: boolean;
 }
 
 interface TreeProps {
@@ -221,10 +222,19 @@ class Tree extends React.Component<TreeProps, TreeState> {
     return null;
   }
 
+  updateList = () => this.list.forceUpdateGrid();
+
+  isRowExpanded = (item, index) => {
+    const { currentAnimation, expandedMap } = this.state;
+    return (currentAnimation && currentAnimation.rowIndex === index && currentAnimation.isExpanding) ||
+      get([item.level, item.id], expandedMap);
+  };
+
   renderRow = ({ key, index, style }) => {
     const { itemRenderer, rowHeight } = this.props;
-    const { normalizedTreeItems, currentAnimation } = this.state;
+    const { normalizedTreeItems, currentAnimation} = this.state;
     const item = normalizedTreeItems[index];
+    const isExpanded = this.isRowExpanded(item, index);
     const expandCallback = currentAnimation
       ? noop
       : this.getRowClickHandler(item.level, item.id, index);
@@ -241,8 +251,8 @@ class Tree extends React.Component<TreeProps, TreeState> {
           {itemRenderer({
             expandCallback,
             // todo check why we need this
-            updateCallback: this.list.forceUpdateGrid,
-            item
+            updateCallback: this.updateList,
+          item: {...item, isExpanded}
           })}
         </div>
         {currentAnimation &&

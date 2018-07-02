@@ -5,7 +5,7 @@ import Tree from "./Tree";
 import { range } from "lodash/fp";
 const uuid = require("uuid/v4");
 
-const items = range(0, 200).map(() => ({
+const items = range(0, 5).map(() => ({
   id: uuid(),
   name: uuid(),
   children: range(0, 20).map(() => ({
@@ -36,7 +36,7 @@ ReactDOM.render(
     transitionDuration={250}
     itemRenderer={renderItem}
     className="list"
-    itemHeight={20}
+    rowHeight={20}
     items={items}
   />,
   document.getElementById("root")
