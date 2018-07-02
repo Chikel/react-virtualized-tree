@@ -113,9 +113,10 @@ class Tree extends React.Component<TreeProps, TreeState> {
 
   /*** sorted by priority: ***/
   // todo 1.) smooth scroll to the expanded row (make the row positioned as most top as possible)
-  // todo 2.) disable click on item without children
-  // todo 3.) add types to all the functions
-  // todo 4.) #cleancoding
+  // todo 2.) take level into account when calculating transition durations
+  // todo 3.) disable click on item without children
+  // todo 4.) add types to all the functions
+  // todo .) #cleancoding
   getRowClickHandler = (rowLevel, rowId, rowIndex) => () => {
     const { rowTopOffsets, listHeight, list, props, state } = this;
     const { items, transitionDuration, itemHeight } = props;
