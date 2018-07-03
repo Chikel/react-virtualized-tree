@@ -92,7 +92,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
     <style>
       @keyframes expand {
         to {
-          height: ${this.props.itemHeight *
+          height: ${this.props.rowHeight *
             this.state.currentAnimation.animatedChildRowItems.length}px;
         }
       }
@@ -105,7 +105,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
       
       @keyframes slideUp {
         to {
-          transform: translateY(-${this.props.itemHeight *
+          transform: translateY(-${this.props.rowHeight *
             this.state.currentAnimation.animatedChildRowItems.length}px);
         }
       }
@@ -119,7 +119,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
   // todo 4.) #cleancoding
   getRowClickHandler = (rowLevel, rowId, rowIndex) => () => {
     const { rowTopOffsets, listHeight, list, props, state } = this;
-    const { items, transitionDuration, itemHeight } = props;
+    const { items, transitionDuration, rowHeight } = props;
     const { expandedMap, normalizedTreeItems: treeItems, scrollTop } = state;
     const nextExpandedMap = update(
       [rowLevel, rowId],
@@ -128,10 +128,10 @@ class Tree extends React.Component<TreeProps, TreeState> {
     );
     const nextTreeItems = this.getNormalizedTreeItems(items, nextExpandedMap);
     const offsetTop = rowTopOffsets[rowIndex] - scrollTop;
-    const availableHeight = listHeight - offsetTop - itemHeight;
+    const availableHeight = listHeight - offsetTop - rowHeight;
     const deltaRowCount = Math.abs(nextTreeItems.length - treeItems.length);
     const animatedRowCount = Math.min(
-      Math.round(availableHeight / itemHeight),
+      Math.round(availableHeight / rowHeight),
       deltaRowCount
     );
     const isExpanding = !get([rowLevel, rowId], expandedMap);
@@ -177,19 +177,19 @@ class Tree extends React.Component<TreeProps, TreeState> {
       isExpanding,
       duration
     } = this.state.currentAnimation;
-    const { itemHeight } = this.props;
+    const { rowHeight } = this.props;
 
     return {
       position: "absolute" as "absolute",
-      top: parentRowStyle.top + itemHeight,
+      top: parentRowStyle.top + rowHeight,
       right: 0,
       left: 0,
-      height: isExpanding ? 0 : animatedChildRowItems.length * itemHeight,
+      height: isExpanding ? 0 : animatedChildRowItems.length * rowHeight,
       overflow: "hidden",
       animation: `${
         isExpanding ? "expand" : "collapse"
       } ${duration}ms forwards`,
-      animationTimingFunction: "linear"
+      animationTimingFunction: "ease-out"
     };
   };
 
@@ -204,18 +204,18 @@ class Tree extends React.Component<TreeProps, TreeState> {
       isExpanding,
       duration
     } = this.state.currentAnimation;
-    const { itemHeight } = this.props;
+    const { rowHeight } = this.props;
 
     if (index > animatedRowIndex) {
       return isExpanding
         ? {
-            top: style.top + animatedChildRowItems.length * itemHeight,
-            transition: `top linear ${duration}ms`
+            top: style.top + animatedChildRowItems.length * rowHeight,
+            transition: `top ease-out ${duration}ms`
           }
         : {
-            top: style.top + animatedChildRowItems.length * itemHeight,
+            top: style.top + animatedChildRowItems.length * rowHeight,
             animation: `slideUp ${duration}ms forwards`,
-            animationTimingFunction: "linear"
+            animationTimingFunction: "ease-out"
           };
     }
 
@@ -231,7 +231,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
   };
 
   renderRow = ({ key, index, style }) => {
-    const { itemRenderer, itemHeight } = this.props;
+    const { itemRenderer, rowHeight } = this.props;
     const { normalizedTreeItems, currentAnimation } = this.state;
     const item = normalizedTreeItems[index];
     const isExpanded = this.isRowExpanded(item, index);
@@ -261,7 +261,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
               {currentAnimation.animatedChildRowItems.map(
                 (currentItem, index) => (
                   <div
-                    style={{ ...style, top: index * itemHeight }}
+                    style={{ ...style, top: index * rowHeight }}
                     key={currentItem.id}
                   >
                     {itemRenderer({ item: currentItem })}
@@ -276,7 +276,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
 
   render() {
     const { normalizedTreeItems } = this.state;
-    const { className, itemHeight } = this.props;
+    const { className, rowHeight } = this.props;
 
     return (
       <div className={className} style={{ userSelect: "none" }}>
@@ -294,7 +294,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
                 className="virtualized-tree"
                 rowRenderer={this.renderRow}
                 onScroll={this.onScroll}
-                rowHeight={itemHeight}
+                rowHeight={rowHeight}
                 height={height}
                 width={width}
               />
