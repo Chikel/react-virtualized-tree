@@ -1,7 +1,6 @@
 import * as React from "react";
 import { AutoSizer, List } from "react-virtualized";
 import { flatten, update, get, noop } from "lodash/fp";
-import cx from "classnames";
 
 interface Item {
   id: string | number;
@@ -85,31 +84,41 @@ class Tree extends React.Component<TreeProps, TreeState> {
     );
   }
 
-  getCssAnimationStyle = () =>
-    this.state.currentAnimation &&
-    `
-    <style>
-      @keyframes expand {
-        to {
-          height: ${this.props.itemHeight *
-            this.state.currentAnimation.animatedChildRowItems.length}px;
+  getCssAnimationStyle() {
+    const { currentAnimation, scrollTop } = this.state;
+
+    if (!this.state.currentAnimation) {
+      return null;
+    }
+
+    const offsetTop =
+      this.rowTopOffsets[currentAnimation.rowIndex] - scrollTop;
+
+    return `
+      <style>
+        @keyframes expand {
+          to {
+            transform: translateY(${-offsetTop}px);  
+            height: ${this.props.itemHeight *
+              currentAnimation.animatedChildRowItems.length}px;
+          }
         }
-      }
-      
-      @keyframes collapse {
-        to {
-          height: 0;
+        
+        @keyframes collapse {
+          to {
+            height: 0;
+          }
         }
-      }
-      
-      @keyframes slideUp {
-        to {
-          transform: translateY(-${this.props.itemHeight *
-            this.state.currentAnimation.animatedChildRowItems.length}px);
+        
+        @keyframes slideUp {
+          to {
+            transform: translateY(${-this.props.itemHeight *
+              currentAnimation.animatedChildRowItems.length}px);
+          }
         }
-      }
-    </style>
-  `;
+      </style>
+    `;
+  }
 
   /*** sorted by priority: ***/
   // todo 1.) smooth scroll to the expanded row (make the row positioned as most top as possible)
@@ -131,7 +140,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
     const availableHeight = listHeight - offsetTop - itemHeight;
     const deltaRowCount = Math.abs(nextTreeItems.length - treeItems.length);
     const animatedRowCount = Math.min(
-      Math.round(availableHeight / itemHeight),
+      Math.round((listHeight - itemHeight) / itemHeight),
       deltaRowCount
     );
     const isExpanding = !get([rowLevel, rowId], expandedMap);
@@ -198,18 +207,30 @@ class Tree extends React.Component<TreeProps, TreeState> {
       return null;
     }
 
+    const { state, props, rowTopOffsets } = this;
+    const { currentAnimation, scrollTop } = state;
+    const { itemHeight } = props;
     const {
       rowIndex: animatedRowIndex,
       animatedChildRowItems,
       isExpanding,
       duration
-    } = this.state.currentAnimation;
-    const { itemHeight } = this.props;
+    } = currentAnimation;
+    const offsetTop = rowTopOffsets[animatedRowIndex] - scrollTop;
+
+    if (index <= animatedRowIndex) {
+      return isExpanding
+        ? {
+            top: style.top - offsetTop,
+            transition: `top linear ${duration}ms`
+          }
+        : null;
+    }
 
     if (index > animatedRowIndex) {
       return isExpanding
         ? {
-            top: style.top + animatedChildRowItems.length * itemHeight,
+            top: style.top + (animatedChildRowItems.length * itemHeight) - offsetTop,
             transition: `top linear ${duration}ms`
           }
         : {
