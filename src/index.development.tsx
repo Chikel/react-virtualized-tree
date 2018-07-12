@@ -5,15 +5,21 @@ import Tree from "./Tree";
 import { range } from "lodash/fp";
 const uuid = require("uuid/v4");
 
-const items = range(0, 200).map(() => ({
+const items = range(0, 100).map(() => ({
   id: uuid(),
   name: uuid(),
-  children: range(0, 20).map(() => ({
+  backgroundColor: `rgb(${Math.random() * 0xff}, ${Math.random() *
+    0xff}, ${Math.random() * 0xff})`,
+    children: range(0, Math.round(Math.random() * 20)).map(() => ({
     id: uuid(),
     name: uuid(),
-    children: range(0, 20).map(() => ({
+    backgroundColor: `rgb(${Math.random() * 0xff}, ${Math.random() *
+      0xff}, ${Math.random() * 0xff})`,
+    children: range(0, Math.round(Math.random() * 20)).map(() => ({
       id: uuid(),
-      name: uuid()
+      name: uuid(),
+      backgroundColor: `rgb(${Math.random() * 0xff}, ${Math.random() *
+        0xff}, ${Math.random() * 0xff})`
     }))
   }))
 }));
@@ -21,19 +27,20 @@ const items = range(0, 200).map(() => ({
 const renderItem = ({ item, expandCallback }): JSX.Element => (
   <div
     style={{
-      border: "1px solid silver",
-      paddingLeft: item.level * 20
+      width: 100,
+      height: "100%",
+      border: "1px solid black",
+      backgroundColor: item.backgroundColor,
+      marginLeft: item.level * 20
     }}
     onClick={expandCallback}
     key={item.id}
-  >
-    {item.name}
-  </div>
+  />
 );
 
 ReactDOM.render(
   <Tree
-    transitionDuration={250}
+    transitionDuration={2000}
     itemRenderer={renderItem}
     className="list"
     itemHeight={20}

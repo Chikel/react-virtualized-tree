@@ -6,6 +6,8 @@ interface Item {
   id: string | number;
   children?: Item[];
   level?: number;
+  [key: number]: any;
+  [key: string]: any;
 }
 
 interface TreeProps {
@@ -25,10 +27,10 @@ interface TreeProps {
 interface TreeState {
   normalizedTreeItems: Item[];
   expandedMap: { [treeLevel: number]: { [itemId: number]: boolean } };
-  scrollTop: number;
   currentAnimation: {
     rowIndex: number;
     animatedChildRowItems: Item[];
+    totalChildCount: number;
     isExpanding: boolean;
     duration: number;
   };
@@ -37,16 +39,15 @@ interface TreeState {
 class Tree extends React.Component<TreeProps, TreeState> {
   rowTopOffsets: { [key: number]: number } = {};
   listHeight: number;
+  scrollHeight: number;
+  scrollTop: number;
   list: List;
 
   state = {
     normalizedTreeItems: this.getNormalizedTreeItems(this.props.items),
     expandedMap: {},
-    scrollTop: 0,
     currentAnimation: null
   };
-
-  onScroll = ({ scrollTop }) => this.setState({ scrollTop });
 
   disableMouseWheelEvent = e => {
     e.stopPropagation();
@@ -85,22 +86,17 @@ class Tree extends React.Component<TreeProps, TreeState> {
   }
 
   getCssAnimationStyle() {
-    const { currentAnimation, scrollTop } = this.state;
-
     if (!this.state.currentAnimation) {
       return null;
     }
 
-    const offsetTop =
-      this.rowTopOffsets[currentAnimation.rowIndex] - scrollTop;
+    const animatedChildRowItemsHeight = this.getAnimatedChildRowItemsHeight();
 
     return `
       <style>
         @keyframes expand {
-          to {
-            transform: translateY(${-offsetTop}px);  
-            height: ${this.props.itemHeight *
-              currentAnimation.animatedChildRowItems.length}px;
+          to {  
+            height: ${animatedChildRowItemsHeight}px;
           }
         }
         
@@ -110,34 +106,76 @@ class Tree extends React.Component<TreeProps, TreeState> {
           }
         }
         
-        @keyframes slideUp {
+        @keyframes expandSlideUp {
+          from {
+            transform: translateY(0);
+          }
+          
           to {
-            transform: translateY(${-this.props.itemHeight *
-              currentAnimation.animatedChildRowItems.length}px);
+            transform: translateY(-${this.getExpandingSlideUpDistance()}px);
+          }
+        }
+        
+        @keyframes collapseSlideUp {
+          from {
+            transform: translateY(${this.getCollapsingSlideUpDistance()}px);
+          }
+          
+          to {
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes slideDown {
+          from {
+            transform: translateY(-${this.getCollapsingSlideDownDistance()}px);
+          }
+          
+          to {
+            transform: translateY(0);
           }
         }
       </style>
     `;
   }
 
+  getAvailableHeightForExpanding() {
+    if (!this.state.currentAnimation) {
+      return null;
+    }
+
+    const y =
+      this.rowTopOffsets[this.state.currentAnimation.rowIndex] -
+      get(["_scrollingContainer", "scrollTop"], this.list.Grid);
+
+    return this.listHeight - y - this.props.itemHeight;
+  }
+
+  getAnimatedChildRowItemsHeight() {
+    if (!this.state.currentAnimation) {
+      return null;
+    }
+
+    return (
+      this.state.currentAnimation.animatedChildRowItems.length *
+      this.props.itemHeight
+    );
+  }
+
   /*** sorted by priority: ***/
-  // todo 1.) smooth scroll to the expanded row (make the row positioned as most top as possible)
-  // todo 2.) take level into account when calculating transition durations
-  // todo 3.) disable click on item without children
-  // todo 4.) add types to all the functions
-  // todo .) #cleancoding
+  // todo 1.) fix animations durations (and also take level into account when calculating transition durations)
+  // todo 2.) disable click on item without children
+  // todo 3.) add types to all the functions
   getRowClickHandler = (rowLevel, rowId, rowIndex) => () => {
-    const { rowTopOffsets, listHeight, list, props, state } = this;
+    const { listHeight, list, props, state } = this;
     const { items, transitionDuration, itemHeight } = props;
-    const { expandedMap, normalizedTreeItems: treeItems, scrollTop } = state;
+    const { expandedMap, normalizedTreeItems: treeItems } = state;
     const nextExpandedMap = update(
       [rowLevel, rowId],
       bool => !bool,
       expandedMap
     );
     const nextTreeItems = this.getNormalizedTreeItems(items, nextExpandedMap);
-    const offsetTop = rowTopOffsets[rowIndex] - scrollTop;
-    const availableHeight = listHeight - offsetTop - itemHeight;
     const deltaRowCount = Math.abs(nextTreeItems.length - treeItems.length);
     const animatedRowCount = Math.min(
       Math.round((listHeight - itemHeight) / itemHeight),
@@ -149,6 +187,11 @@ class Tree extends React.Component<TreeProps, TreeState> {
       rowIndex + animatedRowCount + 1
     );
 
+    this.scrollHeight = get(
+      ["_scrollingContainer", "scrollHeight"],
+      this.list.Grid
+    );
+    this.scrollTop = get(["_scrollingContainer", "scrollTop"], this.list.Grid);
     document.addEventListener("mousewheel", this.disableMouseWheelEvent, false);
     this.setState(
       {
@@ -156,6 +199,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
         currentAnimation: {
           rowIndex,
           animatedChildRowItems: animatedItems,
+          totalChildCount: deltaRowCount,
           isExpanding,
           duration: transitionDuration * (animatedRowCount / deltaRowCount)
         }
@@ -163,6 +207,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
       () => {
         list.recomputeRowHeights();
         setTimeout(() => {
+          const deltaScrollTop = this.getExpandingSlideUpDistance();
           document.removeEventListener(
             "mousewheel",
             this.disableMouseWheelEvent
@@ -173,7 +218,16 @@ class Tree extends React.Component<TreeProps, TreeState> {
               expandedMap: nextExpandedMap,
               currentAnimation: null
             },
-            () => list.recomputeRowHeights()
+            () => {
+              list.recomputeRowHeights();
+
+              if (isExpanding) {
+                list.scrollToPosition(
+                  get(["_scrollingContainer", "scrollTop"], this.list.Grid) +
+                    deltaScrollTop
+                );
+              }
+            }
           );
         }, transitionDuration);
       }
@@ -181,61 +235,88 @@ class Tree extends React.Component<TreeProps, TreeState> {
   };
 
   getAnimatedChildRowsContainerStyle = parentRowStyle => {
-    const {
-      animatedChildRowItems,
-      isExpanding,
-      duration
-    } = this.state.currentAnimation;
+    const { isExpanding, duration } = this.state.currentAnimation;
     const { itemHeight } = this.props;
+    const animatedChildRowItemsHeight = this.getAnimatedChildRowItemsHeight();
 
     return {
       position: "absolute" as "absolute",
       top: parentRowStyle.top + itemHeight,
       right: 0,
       left: 0,
-      height: isExpanding ? 0 : animatedChildRowItems.length * itemHeight,
+      height: isExpanding ? 0 : animatedChildRowItemsHeight,
       overflow: "hidden",
-      animation: `${
-        isExpanding ? "expand" : "collapse"
-      } ${duration}ms forwards`,
+      animation: isExpanding
+        ? `expand ${duration}ms forwards, expandSlideUp ${duration}ms forwards`
+        : `collapse ${duration}ms forwards, slideDown ${duration}ms forwards`,
       animationTimingFunction: "linear"
     };
   };
+
+  getExpandingSlideUpDistance = () =>
+    this.getAnimatedChildRowItemsHeight() -
+    this.getExpandingSlideDownDistance();
+
+  getExpandingSlideDownDistance = () =>
+    Math.min(
+      this.getAnimatedChildRowItemsHeight(),
+      this.getAvailableHeightForExpanding()
+    );
+
+  getCollapsingSlideDownDistance() {
+    const { scrollHeight, scrollTop, listHeight } = this;
+    const { totalChildCount } = this.state.currentAnimation;
+    const { itemHeight } = this.props;
+    const hiddenBelow = scrollHeight - scrollTop - listHeight || 0;
+
+    return Math.max(totalChildCount * itemHeight - hiddenBelow, 0);
+  }
+
+  getCollapsingSlideUpDistance() {
+    const { scrollHeight, scrollTop, listHeight } = this;
+    const hiddenBelow = scrollHeight - scrollTop - listHeight || 0;
+    const totalChildCountHeight =
+      this.state.currentAnimation.totalChildCount * this.props.itemHeight;
+
+    return Math.min(
+      this.getAnimatedChildRowItemsHeight(),
+      hiddenBelow -
+        (totalChildCountHeight - this.getAnimatedChildRowItemsHeight())
+    );
+  }
 
   getRowExtraStyle(index, style) {
     if (!this.state.currentAnimation) {
       return null;
     }
 
-    const { state, props, rowTopOffsets } = this;
-    const { currentAnimation, scrollTop } = state;
-    const { itemHeight } = props;
+    const { currentAnimation } = this.state;
     const {
       rowIndex: animatedRowIndex,
-      animatedChildRowItems,
       isExpanding,
       duration
     } = currentAnimation;
-    const offsetTop = rowTopOffsets[animatedRowIndex] - scrollTop;
 
     if (index <= animatedRowIndex) {
       return isExpanding
         ? {
-            top: style.top - offsetTop,
+            top: style.top - this.getExpandingSlideUpDistance(),
             transition: `top linear ${duration}ms`
           }
-        : null;
+        : {
+            animation: `slideDown ${duration}ms forwards`,
+            animationTimingFunction: "linear"
+          };
     }
 
     if (index > animatedRowIndex) {
       return isExpanding
         ? {
-            top: style.top + (animatedChildRowItems.length * itemHeight) - offsetTop,
+            top: style.top + this.getExpandingSlideDownDistance(),
             transition: `top linear ${duration}ms`
           }
         : {
-            top: style.top + animatedChildRowItems.length * itemHeight,
-            animation: `slideUp ${duration}ms forwards`,
+            animation: `collapseSlideUp ${duration}ms forwards`,
             animationTimingFunction: "linear"
           };
     }
@@ -262,7 +343,6 @@ class Tree extends React.Component<TreeProps, TreeState> {
         <div style={rowStyle}>
           {itemRenderer({
             expandCallback,
-            // todo check why we need this
             updateCallback: this.list.forceUpdateGrid,
             item
           })}
@@ -305,7 +385,6 @@ class Tree extends React.Component<TreeProps, TreeState> {
                 ref={node => (this.list = node)}
                 className="virtualized-tree"
                 rowRenderer={this.renderRow}
-                onScroll={this.onScroll}
                 rowHeight={itemHeight}
                 height={height}
                 width={width}

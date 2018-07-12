@@ -11,5 +11,9 @@ body,
 
 .list {
   width: 400px;
-  height: 700px;
+  height: 400px;
+}
+
+* {
+  box-sizing: border-box;
 }
