@@ -126,7 +126,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
           }
         }
         
-        @keyframes slideDown {
+        @keyframes collapseSlideDown {
           from {
             transform: translateY(-${this.getCollapsingSlideDownDistance()}px);
           }
@@ -248,7 +248,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
       overflow: "hidden",
       animation: isExpanding
         ? `expand ${duration}ms forwards, expandSlideUp ${duration}ms forwards`
-        : `collapse ${duration}ms forwards, slideDown ${duration}ms forwards`,
+        : `collapse ${duration}ms forwards, collapseSlideDown ${duration}ms forwards`,
       animationTimingFunction: "linear"
     };
   };
@@ -304,7 +304,7 @@ class Tree extends React.Component<TreeProps, TreeState> {
             transition: `top linear ${duration}ms`
           }
         : {
-            animation: `slideDown ${duration}ms forwards`,
+            animation: `collapseSlideDown ${duration}ms forwards`,
             animationTimingFunction: "linear"
           };
     }
