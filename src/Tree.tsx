@@ -90,8 +90,7 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
   getAnimatedChildRowItemsHeight = () =>
     this.state.currentAnimation.animatedChildRowItems.length * this.props.itemHeight;
 
-  // TODO: Check if we can remove this method
-  getAvailableHeightForExpanding() {
+  getAvailableHeightForSlidingDown() {
     const virtualYOffset = this.state.currentAnimation.rowIndex * this.props.itemHeight;
     const absoluteYOffset = virtualYOffset - this.getListScrollTop();
 
@@ -102,7 +101,7 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
     this.getAnimatedChildRowItemsHeight() - this.getExpandingSlideDownDistance();
 
   getExpandingSlideDownDistance = () =>
-    Math.min(this.getAnimatedChildRowItemsHeight(), this.getAvailableHeightForExpanding());
+    Math.min(this.getAnimatedChildRowItemsHeight(), this.getAvailableHeightForSlidingDown());
 
   getCollapsingSlideDownDistance() {
     const { totalChildCount, initialScrollHeight, initialScrollTop } = this.state.currentAnimation;
