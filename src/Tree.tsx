@@ -38,7 +38,6 @@ interface TreeState {
 
 /*** SORTED BY PRIORITY ***/
 // TODO: Fix animations durations (and also take level into account when calculating transition durations)
-// TODO: Dynamic row heights
 // TODO: Disable click on item without children
 // TODO: Add types to all the functions
 export default class Tree extends React.Component<TreeProps, TreeState> {
