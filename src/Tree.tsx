@@ -17,7 +17,7 @@ interface TreeProps {
       updateCallback?: () => void;
     }
   ) => JSX.Element;
-  itemHeight?: number;
+  itemHeight?: number | (() => number);
   className?: string;
   transitionDuration: number;
 }
