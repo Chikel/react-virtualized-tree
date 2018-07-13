@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { AutoSizer, List } from 'react-virtualized';
-import { flatten, update, get, noop } from 'lodash/fp';
+import { flatten, update, get, noop, sumBy } from 'lodash/fp';
 
 interface Item {
   id: string | number;
@@ -17,7 +17,7 @@ interface TreeProps {
       updateCallback?: () => void;
     }
   ) => JSX.Element;
-  itemHeight?: number | (() => number);
+  itemHeight?: number | ((Item) => number);
   className?: string;
   transitionDuration: number;
 }
@@ -27,8 +27,9 @@ interface TreeState {
   itemsExpandStatuses: { [treeLevel: number]: { [itemId: number]: boolean } };
   currentAnimation: {
     rowIndex: number;
-    animatedChildRowItems: Item[];
-    totalChildCount: number;
+    totalChildItems: Item[];
+    visibleChildItems: Item[];
+    visibleChildItemsHeight: number;
     isExpanding: boolean;
     duration: number;
     initialScrollHeight: number;
@@ -37,6 +38,7 @@ interface TreeState {
 }
 
 /*** SORTED BY PRIORITY ***/
+// TODO: Rename item to row everywhere
 // TODO: Fix animations durations (and also take level into account when calculating transition durations)
 // TODO: Disable click on item without children
 // TODO: Add types to all the functions
@@ -86,38 +88,57 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
 
   getListScrollTop = () => get(['_scrollingContainer', 'scrollTop'], this.list.Grid);
 
-  getAnimatedChildRowItemsHeight = () =>
-    this.state.currentAnimation.animatedChildRowItems.length * this.props.itemHeight;
+  sumItemsHeight(items) {
+    const { itemHeight } = this.props;
+
+    if (typeof itemHeight === 'number') {
+      return items.length * itemHeight;
+    }
+
+    return sumBy(itemHeight, items);
+  }
+
+  getAnimatedRowTotalChildItemsHeight = () =>
+    this.sumItemsHeight(this.state.currentAnimation.totalChildItems);
+
+  // TODO: Remove
+  getAnimatedRowVisibleChildItemsHeight = () => this.state.currentAnimation.visibleChildItemsHeight;
 
   getAvailableHeightForSlidingDown() {
-    const virtualYOffset = this.state.currentAnimation.rowIndex * this.props.itemHeight;
+    const { normalizedTreeItems, currentAnimation } = this.state;
+    const virtualYOffset = this.sumItemsHeight(
+      normalizedTreeItems.slice(0, currentAnimation.rowIndex)
+    );
     const absoluteYOffset = virtualYOffset - this.getListScrollTop();
 
-    return this.getListHeight() - absoluteYOffset - this.props.itemHeight;
+    return (
+      this.getListHeight() -
+      absoluteYOffset -
+      this.getRowHeightByIndex({ index: currentAnimation.rowIndex })
+    );
   }
 
   getExpandingSlideUpDistance = () =>
-    this.getAnimatedChildRowItemsHeight() - this.getExpandingSlideDownDistance();
+    this.getAnimatedRowVisibleChildItemsHeight() - this.getExpandingSlideDownDistance();
 
   getExpandingSlideDownDistance = () =>
-    Math.min(this.getAnimatedChildRowItemsHeight(), this.getAvailableHeightForSlidingDown());
+    Math.min(this.getAnimatedRowVisibleChildItemsHeight(), this.getAvailableHeightForSlidingDown());
 
   getCollapsingSlideDownDistance() {
-    const { totalChildCount, initialScrollHeight, initialScrollTop } = this.state.currentAnimation;
-    const { itemHeight } = this.props;
+    const { initialScrollHeight, initialScrollTop } = this.state.currentAnimation;
     const hiddenBelow = initialScrollHeight - initialScrollTop - this.getListHeight() || 0;
 
-    return Math.max(totalChildCount * itemHeight - hiddenBelow, 0);
+    return Math.max(this.getAnimatedRowTotalChildItemsHeight() - hiddenBelow, 0);
   }
 
   getCollapsingSlideUpDistance() {
-    const { totalChildCount, initialScrollHeight, initialScrollTop } = this.state.currentAnimation;
+    const { initialScrollHeight, initialScrollTop } = this.state.currentAnimation;
     const hiddenBelow = initialScrollHeight - initialScrollTop - this.getListHeight() || 0;
-    const totalChildCountHeight = totalChildCount * this.props.itemHeight;
 
     return Math.min(
-      this.getAnimatedChildRowItemsHeight(),
-      hiddenBelow - (totalChildCountHeight - this.getAnimatedChildRowItemsHeight())
+      this.getAnimatedRowVisibleChildItemsHeight(),
+      hiddenBelow -
+        (this.getAnimatedRowTotalChildItemsHeight() - this.getAnimatedRowVisibleChildItemsHeight())
     );
   }
 
@@ -125,7 +146,7 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
     <style>
       @keyframes expand {
         to {  
-          height: ${this.getAnimatedChildRowItemsHeight()}px;
+          height: ${this.getAnimatedRowVisibleChildItemsHeight()}px;
         }
       }
       
@@ -167,15 +188,17 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
     </style>
   `;
 
-  getAnimatedChildRowsContainerStyle = parentRowStyle => {
-    const { isExpanding, duration } = this.state.currentAnimation;
+  getAnimatedChildRowsContainerStyle = parentTop => {
+    const { currentAnimation } = this.state;
+    const { isExpanding, duration, rowIndex: animatedRowIndex } = currentAnimation;
+    const parentHeight = this.getRowHeightByIndex({ index: animatedRowIndex });
 
     return {
       position: 'absolute' as 'absolute',
-      top: parentRowStyle.top + this.props.itemHeight,
+      top: parentTop + parentHeight,
       right: 0,
       left: 0,
-      height: isExpanding ? 0 : this.getAnimatedChildRowItemsHeight(),
+      height: isExpanding ? 0 : this.getAnimatedRowVisibleChildItemsHeight(),
       overflow: 'hidden',
       animation: isExpanding
         ? `expand ${duration}ms forwards, expandedItemAndAboveItSlideUp ${duration}ms forwards`
@@ -214,19 +237,47 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
         };
   }
 
+  getRowHeight = row =>
+    typeof this.props.itemHeight === 'number' ? this.props.itemHeight : this.props.itemHeight(row);
+
+  getRowHeightByIndex = ({ index }) => this.getRowHeight(this.state.normalizedTreeItems[index]);
+
+  getVisibleRows = (rows, availableHeight) => {
+    let rowsLeft = [...rows];
+    let heightLeft = availableHeight;
+    const visibleRows = [];
+
+    while (rowsLeft.length && heightLeft > 0) {
+      const [poppedRow, ...restOfRows] = rowsLeft;
+
+      rowsLeft = restOfRows;
+      heightLeft -= this.getRowHeight(poppedRow);
+
+      visibleRows.push(poppedRow);
+    }
+
+    return {
+      visibleRows,
+      visibleHeight: Math.min(availableHeight, availableHeight - heightLeft)
+    };
+  };
+
   getItemClickHandler = (rowLevel, rowId, rowIndex) => () => {
     const { list, props, state } = this;
-    const { items, transitionDuration, itemHeight } = props;
+    const { items, transitionDuration } = props;
     const { itemsExpandStatuses, normalizedTreeItems: treeItems } = state;
     const nextItemsExpandStatuses = this.updateItemsExpandStatuses(rowLevel, rowId);
     const nextTreeItems = this.getNormalizedTreeItems(items, nextItemsExpandStatuses);
     const deltaRowCount = Math.abs(nextTreeItems.length - treeItems.length);
-    const maxAnimatedRowCount = Math.round((this.getListHeight() - itemHeight) / itemHeight);
-    const animatedRowCount = Math.min(maxAnimatedRowCount, deltaRowCount);
     const isExpanding = !get([rowLevel, rowId], itemsExpandStatuses);
-    const animatedItems = (isExpanding ? nextTreeItems : treeItems).slice(
+    const availableHeight = this.getListHeight() - this.getRowHeightByIndex({ index: rowIndex });
+    const totalChildItems = (isExpanding ? nextTreeItems : treeItems).slice(
       rowIndex + 1,
-      rowIndex + animatedRowCount + 1
+      rowIndex + deltaRowCount + 1
+    );
+    const { visibleRows: visibleChildItems, visibleHeight } = this.getVisibleRows(
+      totalChildItems,
+      availableHeight
     );
 
     document.addEventListener('mousewheel', this.disableMouseWheelEvent);
@@ -235,10 +286,11 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
         normalizedTreeItems: isExpanding ? treeItems : nextTreeItems,
         currentAnimation: {
           rowIndex,
-          animatedChildRowItems: animatedItems,
-          totalChildCount: deltaRowCount,
+          totalChildItems,
+          visibleChildItems,
+          visibleChildItemsHeight: visibleHeight,
           isExpanding,
-          duration: transitionDuration * (animatedRowCount / deltaRowCount),
+          duration: transitionDuration,
           initialScrollHeight: this.getListScrollHeight(),
           initialScrollTop: this.getListScrollTop()
         }
@@ -269,11 +321,14 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
   };
 
   renderRow = ({ key, index, style }) => {
-    const { itemRenderer, itemHeight } = this.props;
+    const { itemRenderer } = this.props;
     const { normalizedTreeItems, currentAnimation } = this.state;
     const item = normalizedTreeItems[index];
     const onClick = this.getItemClickHandler(item.level, item.id, index);
     const rowStyle = { ...style, ...this.getRowExtraStyle(index, style.top) };
+
+    // TODO: Move from here
+    let top = 0;
 
     return (
       <React.Fragment key={item.id}>
@@ -286,12 +341,20 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
         </div>
         {currentAnimation &&
           index === currentAnimation.rowIndex && (
-            <div style={this.getAnimatedChildRowsContainerStyle(style)}>
-              {currentAnimation.animatedChildRowItems.map((currentItem, index) => (
-                <div style={{ ...style, top: index * itemHeight }} key={currentItem.id}>
-                  {itemRenderer({ item: currentItem })}
-                </div>
-              ))}
+            <div style={this.getAnimatedChildRowsContainerStyle(style.top)}>
+              {currentAnimation.visibleChildItems.map(currentItem => {
+                const currentRowHeight = this.getRowHeight(currentItem);
+
+                const row = (
+                  <div style={{ top, height: currentRowHeight }} key={currentItem.id}>
+                    {itemRenderer({ item: currentItem })}
+                  </div>
+                );
+
+                top += currentRowHeight;
+
+                return row;
+              })}
             </div>
           )}
       </React.Fragment>
@@ -300,19 +363,18 @@ export default class Tree extends React.Component<TreeProps, TreeState> {
 
   render() {
     const { normalizedTreeItems, currentAnimation } = this.state;
-    const { className, itemHeight } = this.props;
 
     return (
-      <div className={className}>
+      <div className={this.props.className}>
         {currentAnimation && <div dangerouslySetInnerHTML={{ __html: this.getCssAnimations() }} />}
         <AutoSizer>
           {({ width, height }) => (
             <List
               rowCount={normalizedTreeItems.length}
               ref={node => (this.list = node)}
-              className="virtualized-tree"
+              rowHeight={this.getRowHeightByIndex}
               rowRenderer={this.renderRow}
-              rowHeight={itemHeight}
+              className="virtualized-tree"
               height={height}
               width={width}
             />
